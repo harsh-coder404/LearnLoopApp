@@ -92,5 +92,10 @@ To run on device/emulator, use Android Studio or run a standard `assembleDebug` 
 - Badge awarding and streak logic
 - AI matching + AI session summaries
 
+## 📱 Download the App
+You can download the latest version of the LearnLoop Android app here:
+
+[![Download APK](https://img.shields.io/badge/Download-APK-green.svg)](https://github.com/harsh-coder404/LearnLoopApp/releases/download/untagged-73d88505557593cfeab5/app-debug.apk)
+
 ## License
 Private project for LearnLoop.
