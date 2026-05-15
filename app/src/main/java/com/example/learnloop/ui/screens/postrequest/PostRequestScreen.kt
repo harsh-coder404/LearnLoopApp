@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.postrequest
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,10 +46,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,9 +55,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
 import com.example.learnloop.ui.components.AvatarInitialsSmall
 import com.example.learnloop.ui.navigation.Screen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.ErrorColor
@@ -74,36 +71,29 @@ import com.example.learnloop.ui.theme.UrgencyHigh
 import com.example.learnloop.ui.theme.UrgencyLow
 import com.example.learnloop.ui.theme.UrgencyMedium
 import com.example.learnloop.ui.theme.UrgencyUrgent
-import kotlin.math.roundToInt
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.postrequest.PostRequestViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun PostRequestScreen(navController: NavController) {
-    var step by remember { mutableIntStateOf(0) }
-    var selectedSubject by remember { mutableStateOf("") }
-    var topic by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var urgency by remember { mutableStateOf("MEDIUM") }
-    var duration by remember { mutableIntStateOf(30) }
-    var language by remember { mutableStateOf("English") }
-    var langDropdownExpanded by remember { mutableStateOf(false) }
-
-    val userBalance = DummyData.currentUser.knowledgeCredits
-    val urgencyMultiplier = when (urgency) { "URGENT" -> 3f; "HIGH" -> 2f; "MEDIUM" -> 1.5f; else -> 1f }
-    val creditCost = ((duration / 30f) * urgencyMultiplier).roundToInt().coerceAtLeast(1)
+fun PostRequestScreen(
+    navController: NavController,
+    viewModel: PostRequestViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().background(Background)) {
         TopAppBar(
             title = { Text("Post a Request", fontWeight = FontWeight.Bold, color = Color.White) },
             navigationIcon = {
-                IconButton(onClick = { if (step == 0) navController.popBackStack() else step-- }) {
+                IconButton(onClick = { if (uiState.step == 0) navController.popBackStack() else viewModel.onStepChange(uiState.step - 1) }) {
                     Icon(Icons.Filled.ArrowBack, null, tint = Color.White)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary)
         )
 
-        StepIndicator(currentStep = step, totalSteps = 4)
+        StepIndicator(currentStep = uiState.step, totalSteps = 4)
 
         Column(
             modifier = Modifier
@@ -112,33 +102,34 @@ fun PostRequestScreen(navController: NavController) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when (step) {
+            when (uiState.step) {
                 0 -> Step1SubjectTopic(
-                    selectedSubject = selectedSubject,
-                    topic = topic,
-                    description = description,
-                    onSubjectSelected = { selectedSubject = it },
-                    onTopicChange = { topic = it },
-                    onDescriptionChange = { description = it }
+                    selectedSubject = uiState.selectedSubject,
+                    topic = uiState.topic,
+                    description = uiState.description,
+                    subjects = uiState.subjects,
+                    onSubjectSelected = viewModel::onSubjectSelected,
+                    onTopicChange = viewModel::onTopicChange,
+                    onDescriptionChange = viewModel::onDescriptionChange
                 )
                 1 -> Step2Preferences(
-                    urgency = urgency,
-                    duration = duration,
-                    language = language,
-                    langDropdownExpanded = langDropdownExpanded,
-                    onUrgencyChange = { urgency = it },
-                    onDurationChange = { duration = it },
-                    onLanguageChange = { language = it },
-                    onLangDropdownChange = { langDropdownExpanded = it }
+                    urgency = uiState.urgency,
+                    duration = uiState.duration,
+                    language = uiState.language,
+                    languages = uiState.languages,
+                    langDropdownExpanded = uiState.isLanguageMenuExpanded,
+                    onUrgencyChange = viewModel::onUrgencyChange,
+                    onDurationChange = viewModel::onDurationChange,
+                    onLanguageChange = viewModel::onLanguageChange,
+                    onLangDropdownChange = viewModel::onLanguageMenuChange
                 )
                 2 -> Step3CostPreview(
-                    duration = duration,
-                    urgency = urgency,
-                    urgencyMultiplier = urgencyMultiplier,
-                    creditCost = creditCost,
-                    userBalance = userBalance
+                    duration = uiState.duration,
+                    urgency = uiState.urgency,
+                    creditCost = uiState.creditCost,
+                    userBalance = uiState.userBalance
                 )
-                3 -> Step4MatchedTutors()
+                3 -> Step4MatchedTutors(uiState.matchedTutors)
             }
         }
 
@@ -146,9 +137,9 @@ fun PostRequestScreen(navController: NavController) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (step > 0) {
+            if (uiState.step > 0) {
                 OutlinedButton(
-                    onClick = { step-- },
+                    onClick = { viewModel.onStepChange(uiState.step - 1) },
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary)
@@ -158,23 +149,23 @@ fun PostRequestScreen(navController: NavController) {
             }
             Button(
                 onClick = {
-                    if (step < 3) step++
+                    if (uiState.step < 3) viewModel.onStepChange(uiState.step + 1)
                     else navController.navigate(Screen.Home.route) { popUpTo(Screen.Home.route) }
                 },
                 modifier = Modifier.weight(1f).height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (step == 3) Accent else Primary,
+                    containerColor = if (uiState.step == 3) Accent else Primary,
                     disabledContainerColor = Primary.copy(alpha = 0.4f)
                 ),
-                enabled = !(step == 2 && userBalance < creditCost)
+                enabled = uiState.isNextEnabled
             ) {
                 Text(
-                    text = when (step) { 3 -> "Confirm & Post ✓"; else -> "Next" },
+                    text = when (uiState.step) { 3 -> "Confirm & Post ✓"; else -> "Next" },
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
                 )
-                if (step < 3) {
+                if (uiState.step < 3) {
                     Spacer(Modifier.width(6.dp))
                     Icon(Icons.Filled.ArrowForward, null, modifier = Modifier.size(16.dp), tint = Color.White)
                 }
@@ -216,12 +207,15 @@ private fun StepIndicator(currentStep: Int, totalSteps: Int) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Step1SubjectTopic(
-    selectedSubject: String, topic: String, description: String,
+    selectedSubject: String,
+    topic: String,
+    description: String,
+    subjects: List<String>,
     onSubjectSelected: (String) -> Unit, onTopicChange: (String) -> Unit, onDescriptionChange: (String) -> Unit
 ) {
     Text("Select Subject", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        DummyData.subjects.forEach { subj ->
+        subjects.forEach { subj ->
             val selected = selectedSubject == subj
             Box(
                 contentAlignment = Alignment.Center,
@@ -255,6 +249,7 @@ private fun Step1SubjectTopic(
 @Composable
 private fun Step2Preferences(
     urgency: String, duration: Int, language: String,
+    languages: List<String>,
     langDropdownExpanded: Boolean,
     onUrgencyChange: (String) -> Unit, onDurationChange: (Int) -> Unit,
     onLanguageChange: (String) -> Unit, onLangDropdownChange: (Boolean) -> Unit
@@ -313,7 +308,7 @@ private fun Step2Preferences(
             modifier = Modifier.menuAnchor().fillMaxWidth()
         )
         ExposedDropdownMenu(expanded = langDropdownExpanded, onDismissRequest = { onLangDropdownChange(false) }) {
-            DummyData.languages.forEach {
+            languages.forEach {
                 DropdownMenuItem(text = { Text(it) }, onClick = { onLanguageChange(it); onLangDropdownChange(false) })
             }
         }
@@ -322,7 +317,7 @@ private fun Step2Preferences(
 
 @Composable
 private fun Step3CostPreview(
-    duration: Int, urgency: String, urgencyMultiplier: Float,
+    duration: Int, urgency: String,
     creditCost: Int, userBalance: Int
 ) {
     val insufficient = userBalance < creditCost
@@ -347,8 +342,8 @@ private fun Step3CostPreview(
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
                 FormulaRow("Duration", "${duration}min")
-                FormulaRow("Urgency ($urgency)", "×${urgencyMultiplier}")
-                FormulaRow("Formula", "(${duration}/30) × ${urgencyMultiplier} = $creditCost cr")
+                FormulaRow("Urgency", urgency)
+                FormulaRow("Estimated Cost", "$creditCost credits")
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
@@ -379,11 +374,10 @@ private fun FormulaRow(label: String, value: String) {
 }
 
 @Composable
-private fun Step4MatchedTutors() {
+private fun Step4MatchedTutors(tutors: List<com.example.learnloop.data.models.User>) {
     Text("Matched Tutors", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
     Text("Top tutors matching your request:", fontSize = 13.sp, color = TextSecondary)
     Spacer(Modifier.height(4.dp))
-    val tutors = DummyData.users.drop(1).take(3)
     tutors.forEachIndexed { index, tutor ->
         TutorMatchCard(tutor = tutor, rank = index, sessions = 12 - index * 3, rating = 4.9f - index * 0.15f)
         Spacer(Modifier.height(10.dp))
@@ -408,7 +402,7 @@ private fun TutorMatchCard(tutor: com.example.learnloop.data.models.User, rank: 
                     if (rank == 0) {
                         Spacer(Modifier.width(6.dp))
                         Box(Modifier.clip(RoundedCornerShape(4.dp)).background(Gold.copy(alpha = 0.15f))) {
-                            Text("🏆 Best Match", fontSize = 10.sp, color = Gold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            Text(" Best Match", fontSize = 10.sp, color = Gold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
                 }

@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.sessionroom
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,13 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,7 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.learnloop.data.models.ChatMessage
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
@@ -79,28 +74,28 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.sessionroom.SessionRoomViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionRoomScreen(navController: NavController, sessionId: String) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var showEndDialog by remember { mutableStateOf(false) }
-    var elapsedSeconds by remember { mutableIntStateOf(0) }
-    val currentUserId = "u1"
-    val otherUserName = "Rahul Gupta"
-
-    LaunchedEffect(Unit) {
-        while (true) { delay(1000); elapsedSeconds++ }
+fun SessionRoomScreen(
+    navController: NavController,
+    sessionId: String,
+    viewModel: SessionRoomViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(sessionId) {
+        viewModel.setSessionId(sessionId)
     }
 
-    val minutes = elapsedSeconds / 60
-    val seconds = elapsedSeconds % 60
+    val minutes = uiState.elapsedSeconds / 60
+    val seconds = uiState.elapsedSeconds % 60
     val timerText = "%02d:%02d".format(minutes, seconds)
 
-    if (showEndDialog) {
+    if (uiState.showEndDialog) {
         AlertDialog(
-            onDismissRequest = { showEndDialog = false },
+            onDismissRequest = { viewModel.onToggleEndDialog(false) },
             title = { Text("End Session?", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to end this session? A summary will be generated.") },
             confirmButton = {
@@ -110,7 +105,7 @@ fun SessionRoomScreen(navController: NavController, sessionId: String) {
                 ) { Text("End Session", color = Color.White) }
             },
             dismissButton = {
-                TextButton(onClick = { showEndDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.onToggleEndDialog(false) }) { Text("Cancel") }
             }
         )
     }
@@ -119,18 +114,18 @@ fun SessionRoomScreen(navController: NavController, sessionId: String) {
         TopAppBar(
             title = {
                 Column {
-                    Text("Session with $otherUserName", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Session with ${uiState.otherUserName}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("⏱ $timerText", fontSize = 12.sp, color = Accent)
                 }
             },
             navigationIcon = {
-                IconButton(onClick = { showEndDialog = true }) {
+                IconButton(onClick = { viewModel.onToggleEndDialog(true) }) {
                     Icon(Icons.Filled.ArrowBack, null, tint = Color.White)
                 }
             },
             actions = {
                 Button(
-                    onClick = { showEndDialog = true },
+                    onClick = { viewModel.onToggleEndDialog(true) },
                     colors = ButtonDefaults.buttonColors(containerColor = ErrorColor),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -145,43 +140,56 @@ fun SessionRoomScreen(navController: NavController, sessionId: String) {
         )
 
         TabRow(
-            selectedTabIndex = selectedTab,
+            selectedTabIndex = uiState.selectedTab,
             containerColor = Primary,
             contentColor = Color.White,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[uiState.selectedTab]),
                     color = Accent
                 )
             }
         ) {
             listOf("Chat", "Whiteboard", "Notes").forEachIndexed { index, title ->
                 Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title, fontWeight = if (selectedTab == index) FontWeight.SemiBold else FontWeight.Normal) },
+                    selected = uiState.selectedTab == index,
+                    onClick = { viewModel.onTabSelected(index) },
+                    text = { Text(title, fontWeight = if (uiState.selectedTab == index) FontWeight.SemiBold else FontWeight.Normal) },
                     selectedContentColor = Color.White,
                     unselectedContentColor = Color.White.copy(alpha = 0.6f)
                 )
             }
         }
 
-        when (selectedTab) {
-            0 -> ChatTab(currentUserId = currentUserId)
-            1 -> WhiteboardTab()
-            2 -> NotesTab()
+        when (uiState.selectedTab) {
+            0 -> ChatTab(
+                currentUserId = uiState.currentUserId,
+                messages = uiState.messages,
+                inputText = uiState.inputText,
+                isCodeMode = uiState.isCodeMode,
+                onInputChange = viewModel::onInputChange,
+                onToggleCodeMode = viewModel::onToggleCodeMode,
+                onSend = viewModel::onSendMessage
+            )
+            1 -> WhiteboardTab(content = uiState.whiteboardContent, onContentChange = viewModel::onWhiteboardChange)
+            2 -> NotesTab(notes = uiState.notes, onNotesChange = viewModel::onNotesChange)
         }
     }
 }
 
 @Composable
-private fun ChatTab(currentUserId: String) {
-    val messages = remember { mutableStateListOf(*DummyData.chatMessages.toTypedArray()) }
-    var inputText by remember { mutableStateOf("") }
-    var isCodeMode by remember { mutableStateOf(false) }
+private fun ChatTab(
+    currentUserId: String,
+    messages: List<ChatMessage>,
+    inputText: String,
+    isCodeMode: Boolean,
+    onInputChange: (String) -> Unit,
+    onToggleCodeMode: () -> Unit,
+    onSend: () -> Unit
+) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
+    androidx.compose.runtime.LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
@@ -210,7 +218,7 @@ private fun ChatTab(currentUserId: String) {
             ) {
                 OutlinedTextField(
                     value = inputText,
-                    onValueChange = { inputText = it },
+                    onValueChange = onInputChange,
                     placeholder = {
                         Text(if (isCodeMode) "Enter code snippet..." else "Type a message...", color = TextSecondary, fontSize = 14.sp)
                     },
@@ -231,7 +239,7 @@ private fun ChatTab(currentUserId: String) {
                     )
                 )
                 IconButton(
-                    onClick = { isCodeMode = !isCodeMode },
+                    onClick = onToggleCodeMode,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
@@ -241,21 +249,7 @@ private fun ChatTab(currentUserId: String) {
                     )
                 }
                 IconButton(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            messages.add(
-                                ChatMessage(
-                                    id = "m${messages.size + 1}",
-                                    senderId = "u1",
-                                    senderName = "Alex Johnson",
-                                    content = inputText,
-                                    type = if (isCodeMode) "CODE" else "TEXT",
-                                    timestamp = "Now"
-                                )
-                            )
-                            inputText = ""
-                        }
-                    },
+                    onClick = onSend,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(20.dp)).background(Primary)
                 ) {
                     Icon(Icons.Filled.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -310,8 +304,7 @@ private fun ChatBubble(message: ChatMessage, isOwn: Boolean) {
 }
 
 @Composable
-private fun WhiteboardTab() {
-    var content by remember { mutableStateOf("") }
+private fun WhiteboardTab(content: String, onContentChange: (String) -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().background(Color(0xFF1A202C)).padding(12.dp)
     ) {
@@ -321,13 +314,13 @@ private fun WhiteboardTab() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Shared Whiteboard", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.7f))
-            IconButton(onClick = { content = "" }) {
+            IconButton(onClick = { onContentChange("") }) {
                 Icon(Icons.Filled.Delete, null, tint = Color(0xFFE53E3E))
             }
         }
         OutlinedTextField(
             value = content,
-            onValueChange = { content = it },
+            onValueChange = onContentChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
@@ -358,8 +351,7 @@ private fun WhiteboardTab() {
 }
 
 @Composable
-private fun NotesTab() {
-    var notes by remember { mutableStateOf("") }
+private fun NotesTab(notes: String, onNotesChange: (String) -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().background(Background).padding(16.dp)
     ) {
@@ -383,7 +375,7 @@ private fun NotesTab() {
         Text("These notes are private to you. Tap 'Save to Session' to share them.", fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(bottom = 10.dp))
         OutlinedTextField(
             value = notes,
-            onValueChange = { notes = it },
+            onValueChange = onNotesChange,
             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f),
             placeholder = { Text("Write your notes here...", color = TextSecondary) },
             colors = OutlinedTextFieldDefaults.colors(
@@ -396,3 +388,5 @@ private fun NotesTab() {
         )
     }
 }
+
+

@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.notifications
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,9 +35,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,8 +45,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
 import com.example.learnloop.data.models.Notification
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.Gold
@@ -58,12 +56,16 @@ import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.SuccessColor
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.notifications.NotificationsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationScreen(navController: NavController) {
-    val notificationsList = remember { mutableStateOf(DummyData.notifications) }
-    val unreadCount = notificationsList.value.count { !it.isRead }
+fun NotificationScreen(
+    navController: NavController,
+    viewModel: NotificationsViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().background(Background)) {
         TopAppBar(
@@ -74,9 +76,9 @@ fun NotificationScreen(navController: NavController) {
                 }
             },
             actions = {
-                if (unreadCount > 0) {
+                if (uiState.unreadCount > 0) {
                     TextButton(onClick = {
-                        notificationsList.value = notificationsList.value.map { it.copy(isRead = true) }
+                        viewModel.markAllRead()
                     }) {
                         Text("Mark all read", fontSize = 13.sp, color = Accent)
                     }
@@ -85,7 +87,7 @@ fun NotificationScreen(navController: NavController) {
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Primary)
         )
 
-        if (notificationsList.value.isEmpty()) {
+        if (uiState.notifications.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("✓", fontSize = 52.sp, color = SuccessColor)
@@ -96,9 +98,9 @@ fun NotificationScreen(navController: NavController) {
                 }
             }
         } else {
-            if (unreadCount > 0) {
+            if (uiState.unreadCount > 0) {
                 Text(
-                    "$unreadCount unread",
+                    "${uiState.unreadCount} unread",
                     fontSize = 12.sp,
                     color = TextSecondary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -106,7 +108,7 @@ fun NotificationScreen(navController: NavController) {
             }
 
             LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                items(notificationsList.value) { notification ->
+                items(uiState.notifications) { notification ->
                     NotificationItem(notification = notification)
                     HorizontalDivider(color = Color(0xFFF0F0F0))
                 }
@@ -181,3 +183,5 @@ private fun notificationIconAndColor(type: String): Pair<ImageVector, Color> {
         else -> Icons.Filled.Notifications to Color(0xFF718096)
     }
 }
+
+

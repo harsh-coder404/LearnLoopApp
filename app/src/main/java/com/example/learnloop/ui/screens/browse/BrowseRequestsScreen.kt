@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.browse
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,10 +33,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.components.RequestCard
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
@@ -55,27 +52,16 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.browse.BrowseRequestsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrowseRequestsScreen(navController: NavController) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedSubject by remember { mutableStateOf("All") }
-    var selectedUrgency by remember { mutableStateOf("All") }
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    val subjects = listOf("All") + DummyData.subjects.take(6)
-    val urgencies = listOf("All", "URGENT", "HIGH", "MEDIUM", "LOW")
-
-    val filtered = DummyData.helpRequests.filter { req ->
-        val matchSearch = searchQuery.isEmpty() || req.topic.contains(searchQuery, ignoreCase = true) || req.subject.contains(searchQuery, ignoreCase = true)
-        val matchSubject = selectedSubject == "All" || req.subject == selectedSubject
-        val matchUrgency = selectedUrgency == "All" || req.urgencyLevel == selectedUrgency
-        matchSearch && matchSubject && matchUrgency && req.status == "OPEN"
-    }
+fun BrowseRequestsScreen(
+    navController: NavController,
+    viewModel: BrowseRequestsViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -103,14 +89,8 @@ fun BrowseRequestsScreen(navController: NavController) {
         containerColor = Background
     ) { innerPadding ->
         PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                scope.launch {
-                    isRefreshing = true
-                    delay(1000)
-                    isRefreshing = false
-                }
-            },
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
             modifier = Modifier.padding(innerPadding)
         ) {
             LazyColumn(
@@ -123,8 +103,8 @@ fun BrowseRequestsScreen(navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::onSearchChange,
                             placeholder = { Text("Search topics, subjects...", color = TextSecondary) },
                             leadingIcon = { Icon(Icons.Filled.Search, null, tint = TextSecondary) },
                             modifier = Modifier.fillMaxWidth(),
@@ -139,13 +119,13 @@ fun BrowseRequestsScreen(navController: NavController) {
                         )
 
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(subjects) { subj ->
-                                FilterChip(subj, selectedSubject == subj) { selectedSubject = subj }
+                            items(uiState.subjects) { subj ->
+                                FilterChip(subj, uiState.selectedSubject == subj) { viewModel.onSubjectSelected(subj) }
                             }
                         }
 
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(urgencies) { urg ->
+                            items(uiState.urgencies) { urg ->
                                 val color = when (urg) {
                                     "URGENT" -> Color(0xFFE53E3E)
                                     "HIGH" -> Color(0xFFDD6B20)
@@ -153,16 +133,16 @@ fun BrowseRequestsScreen(navController: NavController) {
                                     "LOW" -> Color(0xFF718096)
                                     else -> Primary
                                 }
-                                FilterChip(urg, selectedUrgency == urg, activeColor = color) { selectedUrgency = urg }
+                                FilterChip(urg, uiState.selectedUrgency == urg, activeColor = color) { viewModel.onUrgencySelected(urg) }
                             }
                         }
                     }
                 }
 
-                if (filtered.isEmpty()) {
+                if (uiState.filteredRequests.isEmpty()) {
                     item { EmptyRequestsState() }
                 } else {
-                    items(filtered) { request ->
+                    items(uiState.filteredRequests) { request ->
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             RequestCard(
                                 request = request,
@@ -208,7 +188,7 @@ private fun EmptyRequestsState() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("📭", fontSize = 56.sp)
+        Text("", fontSize = 56.sp)
         Spacer(Modifier.height(16.dp))
         Text("No open requests right now", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))

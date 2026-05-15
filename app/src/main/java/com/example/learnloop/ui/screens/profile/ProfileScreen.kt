@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,7 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.learnloop.data.models.Badge
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.components.AvatarInitialsSmall
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
@@ -68,11 +69,16 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.profile.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ProfileScreen(navController: NavController) {
-    val user = DummyData.currentUser
+fun ProfileScreen(
+    navController: NavController,
+    viewModel: ProfileViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedBadge by remember { mutableStateOf<Badge?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
@@ -112,7 +118,7 @@ fun ProfileScreen(navController: NavController) {
                             modifier = Modifier.size(72.dp).clip(CircleShape)
                                 .border(3.dp, Color.White, CircleShape)
                         ) {
-                            AvatarInitialsSmall(user.name, 72)
+                            AvatarInitialsSmall(uiState.user.name, 72)
                         }
                         Box(
                             modifier = Modifier.size(22.dp).clip(CircleShape)
@@ -131,18 +137,18 @@ fun ProfileScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(user.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text(user.institutionEmail, fontSize = 13.sp, color = TextSecondary)
-                if (user.bio != null) {
+                Text(uiState.user.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(uiState.user.institutionEmail, fontSize = 13.sp, color = TextSecondary)
+                uiState.user.bio?.let { bio ->
                     Spacer(Modifier.height(6.dp))
-                    Text(user.bio, fontSize = 13.sp, color = TextSecondary, textAlign = TextAlign.Center)
+                    Text(bio, fontSize = 13.sp, color = TextSecondary, textAlign = TextAlign.Center)
                 }
-                if (user.teachingStreak > 0) {
+                if (uiState.user.teachingStreak > 0) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔥", fontSize = 18.sp)
+                        Text("", fontSize = 18.sp)
                         Spacer(Modifier.width(4.dp))
-                        Text("${user.teachingStreak} day teaching streak!", fontSize = 14.sp, color = Color(0xFFED8936), fontWeight = FontWeight.SemiBold)
+                        Text("${uiState.user.teachingStreak} day teaching streak!", fontSize = 14.sp, color = Color(0xFFED8936), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -156,11 +162,11 @@ fun ProfileScreen(navController: NavController) {
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    StatItem(value = user.totalSessionsTaught.toString(), label = "Taught")
+                    StatItem(value = uiState.user.totalSessionsTaught.toString(), label = "Taught")
                     VerticalDivider()
-                    StatItem(value = user.totalSessionsLearned.toString(), label = "Learned")
+                    StatItem(value = uiState.user.totalSessionsLearned.toString(), label = "Learned")
                     VerticalDivider()
-                    StatItem(value = "${"%.1f".format(user.reputationScore)}★", label = "Avg Rating")
+                    StatItem(value = "${"%.1f".format(uiState.user.reputationScore)}★", label = "Avg Rating")
                 }
             }
         }
@@ -183,7 +189,7 @@ fun ProfileScreen(navController: NavController) {
                         Icon(Icons.Filled.MonetizationOn, null, tint = Gold, modifier = Modifier.size(28.dp))
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text("${user.knowledgeCredits}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Gold)
+                            Text("${uiState.user.knowledgeCredits}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Gold)
                             Text("Knowledge Credits", fontSize = 12.sp, color = TextSecondary)
                         }
                     }
@@ -199,7 +205,7 @@ fun ProfileScreen(navController: NavController) {
         item {
             ProfileSection("Expert In") {
                 FlowRow(modifier = Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    user.subjectExpertise.forEach { exp ->
+                    uiState.user.subjectExpertise.forEach { exp ->
                         Box(
                             modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Accent.copy(alpha = 0.15f))
                         ) {
@@ -215,7 +221,7 @@ fun ProfileScreen(navController: NavController) {
         item {
             ProfileSection("Languages") {
                 FlowRow(modifier = Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    user.languagesSpoken.forEach { lang ->
+                    uiState.user.languagesSpoken.forEach { lang ->
                         Box(
                             modifier = Modifier.clip(RoundedCornerShape(20.dp)).border(1.dp, Accent, RoundedCornerShape(20.dp))
                         ) {
@@ -237,7 +243,7 @@ fun ProfileScreen(navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         userScrollEnabled = false
                     ) {
-                        items(DummyData.badges) { badge ->
+                        items(uiState.badges) { badge ->
                             BadgeItem(badge = badge, onClick = { selectedBadge = badge })
                         }
                     }
@@ -333,3 +339,5 @@ private fun BadgeDetailSheet(badge: Badge, onDismiss: () -> Unit) {
         Spacer(Modifier.height(24.dp))
     }
 }
+
+

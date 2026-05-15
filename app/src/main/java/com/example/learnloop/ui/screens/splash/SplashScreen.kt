@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.splash
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -29,22 +29,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Primary
-import kotlinx.coroutines.delay
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.splash.SplashViewModel
 
 @Composable
-fun SplashScreen(navController: NavController) {
+fun SplashScreen(
+    navController: NavController,
+    viewModel: SplashViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState = viewModel.uiState.collectAsStateWithLifecycle()
     val alpha = remember { Animatable(0f) }
     val scale = remember { Animatable(0.85f) }
 
     LaunchedEffect(Unit) {
         alpha.animateTo(1f, animationSpec = tween(700))
         scale.animateTo(1f, animationSpec = tween(700))
-        delay(1500)
-        navController.navigate(Screen.Login.route) {
-            popUpTo(Screen.Splash.route) { inclusive = true }
+    }
+
+    LaunchedEffect(uiState.value.isReady) {
+        if (uiState.value.isReady) {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(Screen.Splash.route) { inclusive = true }
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.register
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,7 +45,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,7 +60,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
@@ -69,23 +69,31 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.register.RegisterEvent
+import com.example.learnloop.ui.screens.register.RegisterViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RegisterScreen(navController: NavController) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var institutionEmail by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    val selectedSubjects = remember { mutableStateListOf<Pair<String, String>>() }
-    val selectedLanguages = remember { mutableStateListOf<String>() }
+fun RegisterScreen(
+    navController: NavController,
+    viewModel: RegisterViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var subjectDropdownExpanded by remember { mutableStateOf(false) }
     var levelDropdownExpanded by remember { mutableStateOf(false) }
     var selectedSubjectTemp by remember { mutableStateOf("") }
     var selectedLevelTemp by remember { mutableStateOf("Beginner") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            if (event is RegisterEvent.NavigateToOtp) {
+                navController.navigate(Screen.Otp.createRoute(event.email))
+            }
+        }
+    }
+
 
     val levels = listOf("Beginner", "Intermediate", "Expert")
 
@@ -114,43 +122,43 @@ fun RegisterScreen(navController: NavController) {
             SectionLabel("Basic Information")
 
             OutlinedTextField(
-                value = name, onValueChange = { name = it },
+                value = uiState.name, onValueChange = viewModel::onNameChange,
                 label = { Text("Full Name") },
                 leadingIcon = { Icon(Icons.Filled.Person, null, tint = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                 colors = fieldColors(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
             OutlinedTextField(
-                value = email, onValueChange = { email = it },
+                value = uiState.email, onValueChange = viewModel::onEmailChange,
                 label = { Text("Email") },
                 leadingIcon = { Icon(Icons.Filled.Email, null, tint = TextSecondary) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = fieldColors()
             )
             OutlinedTextField(
-                value = institutionEmail, onValueChange = { institutionEmail = it },
+                value = uiState.institutionEmail, onValueChange = viewModel::onInstitutionEmailChange,
                 label = { Text("Institution Email") },
                 leadingIcon = { Icon(Icons.Filled.School, null, tint = TextSecondary) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = fieldColors()
             )
             OutlinedTextField(
-                value = password, onValueChange = { password = it },
+                value = uiState.password, onValueChange = viewModel::onPasswordChange,
                 label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Filled.Lock, null, tint = TextSecondary) },
                 trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null, tint = TextSecondary)
+                    IconButton(onClick = viewModel::onTogglePasswordVisibility) {
+                        Icon(if (uiState.passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null, tint = TextSecondary)
                     }
                 },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                visualTransformation = if (uiState.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = fieldColors()
             )
 
             SectionLabel("Subject Expertise (up to 5)")
 
-            if (selectedSubjects.size < 5) {
+            if (uiState.selectedSubjects.size < 5) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ExposedDropdownMenuBox(
                         expanded = subjectDropdownExpanded,
@@ -171,7 +179,7 @@ fun RegisterScreen(navController: NavController) {
                             expanded = subjectDropdownExpanded,
                             onDismissRequest = { subjectDropdownExpanded = false }
                         ) {
-                            DummyData.subjects.forEach { subject ->
+                            uiState.subjects.forEach { subject ->
                                 DropdownMenuItem(
                                     text = { Text(subject) },
                                     onClick = { selectedSubjectTemp = subject; subjectDropdownExpanded = false }
@@ -208,8 +216,8 @@ fun RegisterScreen(navController: NavController) {
                     }
                     IconButton(
                         onClick = {
-                            if (selectedSubjectTemp.isNotBlank() && selectedSubjects.none { it.first == selectedSubjectTemp }) {
-                                selectedSubjects.add(selectedSubjectTemp to selectedLevelTemp)
+                            if (selectedSubjectTemp.isNotBlank()) {
+                                viewModel.addSubject(selectedSubjectTemp, selectedLevelTemp)
                                 selectedSubjectTemp = ""
                             }
                         }
@@ -219,26 +227,27 @@ fun RegisterScreen(navController: NavController) {
                 }
             }
 
-            if (selectedSubjects.isNotEmpty()) {
+            if (uiState.selectedSubjects.isNotEmpty()) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    selectedSubjects.forEach { (subj, level) ->
-                        SubjectLevelChip(subj, level) { selectedSubjects.remove(subj to level) }
+                    uiState.selectedSubjects.forEach { selection ->
+                        SubjectLevelChip(selection.subject, selection.level) {
+                            viewModel.removeSubject(selection.subject, selection.level)
+                        }
                     }
                 }
             }
 
             SectionLabel("Languages Spoken")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DummyData.languages.take(10).forEach { lang ->
-                    val selected = selectedLanguages.contains(lang)
+                uiState.languages.take(10).forEach { lang ->
+                    val selected = uiState.selectedLanguages.contains(lang)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (selected) Primary else Background)
                             .border(1.dp, if (selected) Primary else Color(0xFFCBD5E0), RoundedCornerShape(20.dp))
                             .clickable {
-                                if (selected) selectedLanguages.remove(lang)
-                                else selectedLanguages.add(lang)
+                                viewModel.toggleLanguage(lang)
                             }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
@@ -250,10 +259,7 @@ fun RegisterScreen(navController: NavController) {
             Spacer(Modifier.height(8.dp))
 
             Button(
-                onClick = {
-                    val encodedEmail = email.ifBlank { "user@example.com" }
-                    navController.navigate(Screen.Otp.createRoute(encodedEmail))
-                },
+                onClick = viewModel::onCreateAccount,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)

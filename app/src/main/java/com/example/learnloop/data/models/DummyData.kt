@@ -4,9 +4,9 @@ object DummyData {
 
     val currentUser = User(
         id = "u1",
-        name = "Alex Johnson",
-        email = "alex@example.com",
-        institutionEmail = "alex.johnson@university.edu",
+        name = "Harsh",
+        email = "email12@gmail.com",
+        institutionEmail = "harsh@university.edu",
         isVerified = true,
         knowledgeCredits = 47,
         reputationScore = 4.8f,

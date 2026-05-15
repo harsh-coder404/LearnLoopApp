@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +50,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.components.ActiveSessionCardCompact
 import com.example.learnloop.ui.components.RequestCard
 import com.example.learnloop.ui.navigation.Screen
@@ -60,12 +62,16 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.home.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController) {
-    val user = DummyData.currentUser
-    val unreadCount = DummyData.notifications.count { !it.isRead }
+fun HomeScreen(
+    navController: NavController,
+    viewModel: HomeViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background),
@@ -83,9 +89,9 @@ fun HomeScreen(navController: NavController) {
                 actions = {
                     BadgedBox(
                         badge = {
-                            if (unreadCount > 0) {
+                            if (uiState.unreadCount > 0) {
                                 Badge(containerColor = Color(0xFFE53E3E)) {
-                                    Text("$unreadCount", fontSize = 9.sp, color = Color.White)
+                                    Text("${uiState.unreadCount}", fontSize = 9.sp, color = Color.White)
                                 }
                             }
                         }
@@ -101,16 +107,16 @@ fun HomeScreen(navController: NavController) {
 
         item {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (user.teachingStreak > 0) {
-                    StreakBanner(streak = user.teachingStreak)
+                if (uiState.user.teachingStreak > 0) {
+                    StreakBanner(streak = uiState.user.teachingStreak)
                 }
 
-                CreditsCard(credits = user.knowledgeCredits, onViewHistory = { navController.navigate(Screen.CreditWallet.route) })
+                CreditsCard(credits = uiState.user.knowledgeCredits, onViewHistory = { navController.navigate(Screen.CreditWallet.route) })
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionCard(
                         title = "Get Help",
-                        emoji = "📚",
+                        emoji = "",
                         subtitle = "Post a request",
                         color = Primary,
                         modifier = Modifier.weight(1f),
@@ -118,7 +124,7 @@ fun HomeScreen(navController: NavController) {
                     )
                     ActionCard(
                         title = "Teach & Earn",
-                        emoji = "💡",
+                        emoji = "",
                         subtitle = "Browse requests",
                         color = Accent,
                         modifier = Modifier.weight(1f),
@@ -141,14 +147,14 @@ fun HomeScreen(navController: NavController) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(DummyData.activeSessions) { session ->
+                items(uiState.activeSessions) { session ->
                     ActiveSessionCardCompact(
                         session = session,
                         onJoinClick = { navController.navigate(Screen.SessionRoom.createRoute(session.id)) }
                     )
                 }
                 item {
-                    if (DummyData.activeSessions.isEmpty()) {
+                    if (uiState.activeSessions.isEmpty()) {
                         EmptySessionsCard()
                     }
                 }
@@ -162,7 +168,7 @@ fun HomeScreen(navController: NavController) {
             )
         }
 
-        items(DummyData.helpRequests.take(5)) { request ->
+        items(uiState.openRequests.take(5)) { request ->
             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
                 RequestCard(
                     request = request,
@@ -184,7 +190,7 @@ private fun StreakBanner(streak: Int) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("🔥", fontSize = 24.sp)
+        Text("", fontSize = 24.sp)
         Spacer(Modifier.width(8.dp))
         Column {
             Text("$streak Day Teaching Streak!", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -290,7 +296,7 @@ private fun EmptySessionsCard() {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("📭", fontSize = 24.sp)
+            Text("", fontSize = 24.sp)
             Spacer(Modifier.height(4.dp))
             Text("No active sessions", fontSize = 12.sp, color = TextSecondary, textAlign = TextAlign.Center)
         }

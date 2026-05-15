@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.sessionsummary
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -36,10 +36,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.learnloop.ui.navigation.Screen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.Gold
@@ -58,12 +58,20 @@ import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.sessionsummary.SessionSummaryViewModel
 
 @Composable
-fun SessionSummaryScreen(navController: NavController, sessionId: String) {
-    var rating by remember { mutableIntStateOf(0) }
-    var comment by remember { mutableStateOf("") }
-    val isTutor = true
+fun SessionSummaryScreen(
+    navController: NavController,
+    sessionId: String,
+    viewModel: SessionSummaryViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(sessionId) {
+        viewModel.onScreenShown(sessionId)
+    }
 
     Column(
         modifier = Modifier
@@ -87,7 +95,7 @@ fun SessionSummaryScreen(navController: NavController, sessionId: String) {
                 }
                 Spacer(Modifier.height(10.dp))
                 Text("Session Complete! 🎉", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("45 minutes  ·  BST Deletion", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                Text(uiState.sessionSubtitle, fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
             }
         }
 
@@ -95,11 +103,16 @@ fun SessionSummaryScreen(navController: NavController, sessionId: String) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            CreditsEarnedCard(isTutor = isTutor, amount = 3)
+            CreditsEarnedCard(isTutor = uiState.isTutor, amount = uiState.creditAmount)
 
-            AiSummaryCard()
+            AiSummaryCard(uiState.summarySections)
 
-            RatingCard(rating = rating, comment = comment, onRatingChange = { rating = it }, onCommentChange = { comment = it })
+            RatingCard(
+                rating = uiState.rating,
+                comment = uiState.comment,
+                onRatingChange = viewModel::onRatingChange,
+                onCommentChange = viewModel::onCommentChange
+            )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
@@ -159,7 +172,7 @@ private fun CreditsEarnedCard(isTutor: Boolean, amount: Int) {
 }
 
 @Composable
-private fun AiSummaryCard() {
+private fun AiSummaryCard(sections: List<SummarySection>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -176,40 +189,22 @@ private fun AiSummaryCard() {
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))
 
-            SummarySection(
-                title = "Key Concepts Covered",
-                items = listOf(
-                    "Binary Search Tree deletion algorithm",
-                    "In-order successor concept",
-                    "Three cases: no child, one child, two children",
-                    "Time complexity: O(h) where h = height"
+            sections.forEachIndexed { index, section ->
+                SummarySectionBlock(
+                    title = section.title,
+                    items = section.items,
+                    numbered = section.numbered
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-            SummarySection(
-                title = "Code / Notes Shared",
-                items = listOf(
-                    "BST delete() pseudocode walkthrough",
-                    "findMin() helper function",
-                    "Recursive deletion implementation"
-                )
-            )
-            Spacer(Modifier.height(12.dp))
-            SummarySection(
-                title = "3 Takeaways",
-                items = listOf(
-                    "Always find the in-order successor (smallest in right subtree) for two-child deletion.",
-                    "The in-order successor has at most one right child, simplifying its own deletion.",
-                    "For balanced BSTs: O(log n), but O(n) worst-case for skewed trees."
-                ),
-                numbered = true
-            )
+                if (index != sections.lastIndex) {
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SummarySection(title: String, items: List<String>, numbered: Boolean = false) {
+private fun SummarySectionBlock(title: String, items: List<String>, numbered: Boolean = false) {
     Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Primary)
     Spacer(Modifier.height(6.dp))
     items.forEachIndexed { index, item ->
@@ -252,7 +247,7 @@ private fun RatingCard(rating: Int, comment: String, onRatingChange: (Int) -> Un
                             .padding(2.dp)
                             .clickable(
                                 indication = null,
-                                interactionSource = remember { MutableInteractionSource() }
+                                interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }
                             ) { onRatingChange(star) }
                     )
                 }
@@ -279,3 +274,6 @@ private fun RatingCard(rating: Int, comment: String, onRatingChange: (Int) -> Un
         }
     }
 }
+
+
+

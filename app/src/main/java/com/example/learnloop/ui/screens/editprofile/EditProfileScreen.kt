@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.editprofile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,27 +26,37 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.editprofile.EditProfileEvent
+import com.example.learnloop.ui.screens.editprofile.EditProfileViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditProfileScreen(navController: NavController) {
-    val user = DummyData.currentUser
-    var name by remember { mutableStateOf(user.name) }
-    var bio by remember { mutableStateOf(user.bio ?: "") }
-    var institutionEmail by remember { mutableStateOf(user.institutionEmail) }
+fun EditProfileScreen(
+    navController: NavController,
+    viewModel: EditProfileViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            if (event is EditProfileEvent.NavigateBack) {
+                navController.popBackStack()
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(Background)) {
         TopAppBar(
@@ -69,8 +79,8 @@ fun EditProfileScreen(navController: NavController) {
             Text("Basic Info", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Primary)
 
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = uiState.name,
+                onValueChange = viewModel::onNameChange,
                 label = { Text("Full Name") },
                 leadingIcon = { Icon(Icons.Filled.Person, null, tint = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
@@ -79,8 +89,8 @@ fun EditProfileScreen(navController: NavController) {
             )
 
             OutlinedTextField(
-                value = institutionEmail,
-                onValueChange = { institutionEmail = it },
+                value = uiState.institutionEmail,
+                onValueChange = viewModel::onInstitutionEmailChange,
                 label = { Text("Institution Email") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -88,8 +98,8 @@ fun EditProfileScreen(navController: NavController) {
             )
 
             OutlinedTextField(
-                value = bio,
-                onValueChange = { bio = it },
+                value = uiState.bio,
+                onValueChange = viewModel::onBioChange,
                 label = { Text("Bio") },
                 placeholder = { Text("Tell others about yourself...") },
                 modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -101,7 +111,7 @@ fun EditProfileScreen(navController: NavController) {
             Spacer(Modifier.height(8.dp))
 
             Button(
-                onClick = { navController.popBackStack() },
+                onClick = viewModel::onSave,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
@@ -111,3 +121,5 @@ fun EditProfileScreen(navController: NavController) {
         }
     }
 }
+
+

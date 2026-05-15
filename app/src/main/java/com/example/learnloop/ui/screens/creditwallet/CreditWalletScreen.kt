@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.creditwallet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -52,7 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.learnloop.data.models.CreditTransaction
-import com.example.learnloop.data.models.DummyData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.ErrorColor
@@ -62,12 +63,16 @@ import com.example.learnloop.ui.theme.SuccessColor
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.creditwallet.CreditWalletViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreditWalletScreen(navController: NavController) {
-    val user = DummyData.currentUser
-    val transactions = DummyData.creditTransactions
+fun CreditWalletScreen(
+    navController: NavController,
+    viewModel: CreditWalletViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var howItWorksExpanded by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -99,7 +104,7 @@ fun CreditWalletScreen(navController: NavController) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.MonetizationOn, null, tint = Gold, modifier = Modifier.size(40.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("${user.knowledgeCredits}", fontSize = 52.sp, fontWeight = FontWeight.Bold, color = Gold)
+                        Text("${uiState.user.knowledgeCredits}", fontSize = 52.sp, fontWeight = FontWeight.Bold, color = Gold)
                     }
                     Text("credits", fontSize = 16.sp, color = Color.White.copy(alpha = 0.7f))
                 }
@@ -119,7 +124,7 @@ fun CreditWalletScreen(navController: NavController) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("💡 How Credits Work", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        Text(" How Credits Work", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                         Icon(
                             if (howItWorksExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                             null, tint = TextSecondary
@@ -127,11 +132,11 @@ fun CreditWalletScreen(navController: NavController) {
                     }
                     AnimatedVisibility(visible = howItWorksExpanded) {
                         Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                            HowItWorksItem("🎁 New accounts start with 20 free credits")
-                            HowItWorksItem("📚 Spend credits to get help from tutors")
-                            HowItWorksItem("💰 Tutors earn 90% of what learners spend")
+                            HowItWorksItem(" New accounts start with 20 free credits")
+                            HowItWorksItem(" Spend credits to get help from tutors")
+                            HowItWorksItem(" Tutors earn 90% of what learners spend")
                             HowItWorksItem("⚡ Urgent requests cost more credits")
-                            HowItWorksItem("🏅 Earn bonus credits for top performance")
+                            HowItWorksItem(" Earn bonus credits for top performance")
                             Spacer(Modifier.height(8.dp))
                             Box(
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Accent.copy(alpha = 0.08f)).padding(12.dp)
@@ -154,12 +159,12 @@ fun CreditWalletScreen(navController: NavController) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Transaction History", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text("${transactions.size} transactions", fontSize = 12.sp, color = TextSecondary)
+                Text("${uiState.transactions.size} transactions", fontSize = 12.sp, color = TextSecondary)
             }
         }
 
-        var runningBalance = user.knowledgeCredits
-        items(transactions) { tx ->
+        var runningBalance = uiState.user.knowledgeCredits
+        items(uiState.transactions) { tx ->
             TransactionRow(transaction = tx, runningBalance = runningBalance)
             val delta = if (tx.type == "SPENT") -tx.amount else tx.amount
             runningBalance -= delta
@@ -211,3 +216,5 @@ private fun TransactionRow(transaction: CreditTransaction, runningBalance: Int) 
         }
     }
 }
+
+

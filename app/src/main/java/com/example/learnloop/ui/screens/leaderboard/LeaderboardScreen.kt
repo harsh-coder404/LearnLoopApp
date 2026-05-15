@@ -1,4 +1,4 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.leaderboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,11 +39,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,8 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.learnloop.data.models.DummyData
 import com.example.learnloop.data.models.LeaderboardEntry
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.components.AvatarInitialsSmall
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
@@ -66,21 +62,18 @@ import com.example.learnloop.ui.theme.Silver2nd
 import com.example.learnloop.ui.theme.Surface
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.leaderboard.LeaderboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LeaderboardScreen(navController: NavController) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var selectedSubject by remember { mutableStateOf("All") }
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val currentUserId = "u1"
-
-    val subjects = listOf("All", "CS", "Math", "Physics", "Biology", "Economics")
-    val entries = DummyData.leaderboard
-    val currentUserEntry = entries.find { it.user.id == currentUserId } ?: entries[4]
+fun LeaderboardScreen(
+    navController: NavController,
+    viewModel: LeaderboardViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentUserEntry = uiState.currentUserEntry
+    val entries = uiState.entries
 
     Column(modifier = Modifier.fillMaxSize().background(Background)) {
         TopAppBar(
@@ -89,21 +82,21 @@ fun LeaderboardScreen(navController: NavController) {
         )
 
         TabRow(
-            selectedTabIndex = selectedTab,
+            selectedTabIndex = uiState.selectedTab,
             containerColor = Primary,
             contentColor = Color.White,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[uiState.selectedTab]),
                     color = Accent
                 )
             }
         ) {
             listOf("This Week", "All Time").forEachIndexed { index, title ->
                 Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title, fontWeight = if (selectedTab == index) FontWeight.SemiBold else FontWeight.Normal) },
+                    selected = uiState.selectedTab == index,
+                    onClick = { viewModel.onTabSelected(index) },
+                    text = { Text(title, fontWeight = if (uiState.selectedTab == index) FontWeight.SemiBold else FontWeight.Normal) },
                     selectedContentColor = Color.White,
                     unselectedContentColor = Color.White.copy(alpha = 0.6f)
                 )
@@ -112,10 +105,8 @@ fun LeaderboardScreen(navController: NavController) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = {
-                    scope.launch { isRefreshing = true; delay(800); isRefreshing = false }
-                }
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = viewModel::refresh
             ) {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 100.dp)
@@ -125,14 +116,14 @@ fun LeaderboardScreen(navController: NavController) {
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(subjects) { subj ->
-                                val selected = selectedSubject == subj
+                            items(uiState.subjects) { subj ->
+                                val selected = uiState.selectedSubject == subj
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(if (selected) Primary else Surface)
                                         .border(1.dp, if (selected) Primary else Color(0xFFCBD5E0), RoundedCornerShape(20.dp))
-                                        .clickable { selectedSubject = subj }
+                                        .clickable { viewModel.onSubjectSelected(subj) }
                                         .padding(horizontal = 14.dp, vertical = 7.dp)
                                 ) {
                                     Text(subj, fontSize = 13.sp, color = if (selected) Color.White else TextSecondary,
@@ -154,45 +145,47 @@ fun LeaderboardScreen(navController: NavController) {
                     }
 
                     itemsIndexed(entries.drop(3)) { index, entry ->
-                        LeaderboardRow(entry = entry, isCurrentUser = entry.user.id == currentUserId)
+                        LeaderboardRow(entry = entry, isCurrentUser = currentUserEntry?.user?.id == entry.user.id)
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF0F0F0))
                     }
                 }
             }
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp)
-                    .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(8.dp),
-                colors = CardDefaults.cardColors(containerColor = Primary)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            if (currentUserEntry != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                        .align(Alignment.BottomCenter),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Primary)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(28.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("#${currentUserEntry.rank}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.size(28.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("#${currentUserEntry.rank}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            AvatarInitialsSmall(currentUserEntry.user.name, 32)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text("You", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Your current rank", fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f))
+                            }
                         }
-                        Spacer(Modifier.width(10.dp))
-                        AvatarInitialsSmall(currentUserEntry.user.name, 32)
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text("You", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Your current rank", fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.MonetizationOn, null, tint = Gold, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text("${currentUserEntry.creditsEarned}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
                         }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.MonetizationOn, null, tint = Gold, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(3.dp))
-                        Text("${currentUserEntry.creditsEarned}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
                     }
                 }
             }
@@ -205,7 +198,7 @@ private fun PodiumRow(entries: List<LeaderboardEntry>) {
     val order = listOf(1, 0, 2)
     val heights = listOf(80.dp, 110.dp, 70.dp)
     val colors = listOf(Silver2nd, Gold1st, Bronze3rd)
-    val medals = listOf("🥈", "🥇", "🥉")
+    val medals = listOf("", "", "")
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
@@ -286,3 +279,5 @@ private fun LeaderboardRow(entry: LeaderboardEntry, isCurrentUser: Boolean) {
         }
     }
 }
+
+

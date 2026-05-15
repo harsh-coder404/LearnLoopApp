@@ -1,7 +1,8 @@
-package com.example.learnloop.ui.screens
+package com.example.learnloop.ui.screens.otp
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,11 +35,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,31 +50,43 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.learnloop.ui.navigation.Screen
 import com.example.learnloop.ui.theme.Accent
 import com.example.learnloop.ui.theme.Background
 import com.example.learnloop.ui.theme.Primary
 import com.example.learnloop.ui.theme.TextPrimary
 import com.example.learnloop.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
+import com.example.learnloop.ui.viewmodel.LearnLoopViewModelFactory
+import com.example.learnloop.ui.screens.otp.OtpEvent
+import com.example.learnloop.ui.screens.otp.OtpViewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OtpVerificationScreen(navController: NavController, email: String) {
-    val otpDigits = remember { mutableStateOf(List(6) { "" }) }
+fun OtpVerificationScreen(
+    navController: NavController,
+    email: String,
+    viewModel: OtpViewModel = viewModel(factory = LearnLoopViewModelFactory())
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusRequesters = remember { List(6) { FocusRequester() } }
-    var countdown by remember { mutableIntStateOf(60) }
-    var canResend by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(email) {
+        viewModel.setEmail(email)
+    }
+
     LaunchedEffect(Unit) {
-        while (countdown > 0) {
-            delay(1000)
-            countdown--
+        viewModel.events.collectLatest { event ->
+            if (event is OtpEvent.NavigateHome) {
+                scope.launch { snackbarHostState.showSnackbar("20 credits added to your wallet!") }
+                navController.navigate(Screen.Home.route) { popUpTo(0) }
+            }
         }
-        canResend = true
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Background)) {
@@ -123,18 +133,14 @@ fun OtpVerificationScreen(navController: NavController, email: String) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    otpDigits.value.forEachIndexed { index, digit ->
+                    uiState.digits.forEachIndexed { index, digit ->
                         OtpBox(
                             value = digit,
                             focusRequester = focusRequesters[index],
                             onValueChange = { newVal ->
-                                if (newVal.length <= 1 && newVal.all { it.isDigit() }) {
-                                    val newList = otpDigits.value.toMutableList()
-                                    newList[index] = newVal
-                                    otpDigits.value = newList
-                                    if (newVal.isNotEmpty() && index < 5) {
-                                        focusRequesters[index + 1].requestFocus()
-                                    }
+                                viewModel.onDigitChange(index, newVal)
+                                if (newVal.isNotEmpty() && index < 5) {
+                                    focusRequesters[index + 1].requestFocus()
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -147,9 +153,9 @@ fun OtpVerificationScreen(navController: NavController, email: String) {
                 Spacer(Modifier.height(24.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!canResend) {
+                    if (!uiState.canResend) {
                         Text("Resend code in ", fontSize = 13.sp, color = TextSecondary)
-                        Text("${countdown}s", fontSize = 13.sp, color = Primary, fontWeight = FontWeight.Bold)
+                        Text("${uiState.countdown}s", fontSize = 13.sp, color = Primary, fontWeight = FontWeight.Bold)
                     } else {
                         Text("Didn't receive a code? ", fontSize = 13.sp, color = TextSecondary)
                         Text(
@@ -157,7 +163,7 @@ fun OtpVerificationScreen(navController: NavController, email: String) {
                             fontSize = 13.sp,
                             color = Accent,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.then(Modifier)
+                            modifier = Modifier.then(Modifier).clickable { viewModel.onResend() }
                         )
                     }
                 }
@@ -165,16 +171,11 @@ fun OtpVerificationScreen(navController: NavController, email: String) {
                 Spacer(Modifier.height(32.dp))
 
                 Button(
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("🎉 20 credits added to your wallet!")
-                        }
-                        navController.navigate(Screen.Home.route) { popUpTo(0) }
-                    },
+                    onClick = viewModel::onVerify,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                    enabled = otpDigits.value.all { it.isNotEmpty() }
+                    enabled = uiState.isVerifyEnabled
                 ) {
                     Text("Verify & Continue", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
